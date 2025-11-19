@@ -824,4 +824,4 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False, host="0.0.0.0", port=8050)
