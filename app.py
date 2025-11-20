@@ -595,6 +595,9 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
 
     if selected_months:
         filtered_downtime = filtered_downtime[filtered_downtime['Month'].isin(selected_months)]
+
+    if selected_generators:
+        filtered_downtime = filtered_downtime[filtered_downtime['Generator'].isin(selected_generators)]
     
     fig_down = px.bar(
         filtered_downtime,
@@ -669,15 +672,25 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     if selected_generators:
         filtered_runtime = filtered_runtime[filtered_runtime['Generator'].isin(selected_generators)]
     
-    fig_runtime = px.pie(
-        filtered_runtime,
-        names="Generator",
-        values="Hours Operated",
-        color_discrete_sequence=brand_colors,
-        hole=0.4
-    )
-
-    fig_runtime.update_traces(textposition="inside", textinfo="percent+label")
+    # Check if data exists after filtering
+    if not filtered_runtime.empty:
+        fig_runtime = px.pie(
+            filtered_runtime,
+            names="Generator",
+            values="Hours Operated",
+            color_discrete_sequence=brand_colors,
+            hole=0.4
+        )
+        fig_runtime.update_traces(textposition="inside", textinfo="percent+label")
+    else:
+        # Create empty pie chart if no data
+        fig_runtime = px.pie(
+            names=["No Data"],
+            values=[1],
+            color_discrete_sequence=brand_colors,
+            hole=0.4
+        )
+    fig_runtime.update_traces(textposition="inside", textinfo="label")
 
     fig_runtime.update_layout(
         title=dict(text='⏱️ Generator Runtime', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
@@ -706,9 +719,9 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     planned_outage = max(0, total_hours_available - operated_hours)
 
     return (fig_bar, fig_line, table_data, table_columns, 
-            f"₦{gravitas_revenue:,.0f}", f"₦{gravitas_subs_revenue:,.0f}", 
-            f"{operated_hours:,.0f}h", f"{planned_outage:,.0f}h",
-            fig_pie, fig_fuel, fig_down, fig_stock, fig_runtime)
+        gravitas_revenue, gravitas_subs_revenue, 
+        f"{operated_hours:,.0f}h", f"{planned_outage:,.0f}h",
+        fig_pie, fig_fuel, fig_down, fig_stock, fig_runtime)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8050))
