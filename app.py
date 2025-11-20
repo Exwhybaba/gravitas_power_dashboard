@@ -50,7 +50,9 @@ df_cost_2025 = corr_Rout.loc[corr_Rout['Year'] == '2025'].copy()
 ## Downtime
 df_downTime = df.parse(2)
 df_downTime = df_downTime.sort_values(by ='Duration_Hours', ascending= False)
-df_downTime['Generator'].replace('88kva', '80kva', inplace= True)
+df_downTime['Generator'] = df_downTime['Generator'].replace('88kva', '80kva')
+
+# df_downTime = df_downTime.groupby(["Month", "Generator"], as_index=False)["Duration_Hours"].sum()
 
 ## runtime
 run_time = df.parse(4)
@@ -135,7 +137,20 @@ def refresh_data():
         # downtime
         df_downTime_new = df_new.parse(2)
         df_downTime_new = df_downTime_new.sort_values(by ='Duration_Hours', ascending= False)
-        df_downTime_new['Generator'].replace('88kva', '80kva', inplace= True)
+        df_downTime_new['Generator'] = df_downTime_new['Generator'].replace('88kva', '80kva')
+
+        month_order = [
+            "January","February","March","April","May","June",
+            "July","August","September","October","November","December"
+        ]
+
+        df_downTime_new["Month"] = pd.Categorical(
+            df_downTime_new["Month"],
+            categories=month_order,
+            ordered=True
+        )
+
+        df_downTime_new = df_downTime_new.groupby(["Month", "Generator"], as_index=False)["Duration_Hours"].sum()
 
         # runtime
         run_time_new = df_new.parse(4)
@@ -547,7 +562,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
         yaxis_title='Amount',
         template="plotly_white",
         showlegend=False,
-        width=500,
+        width=488,
         height=200,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
