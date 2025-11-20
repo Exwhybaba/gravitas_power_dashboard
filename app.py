@@ -318,6 +318,14 @@ app.config.suppress_callback_exceptions = True
 app.layout = html.Div([
     html.Meta(name='viewport', content='width=device-width, initial-scale=1.0'),
     html.Div([
+         # Add toggle button as a Dash component instead of pure JavaScript
+            # html.Button(
+            #     "☰",
+            #     id="sidebar-toggle-btn",
+            #     className="sidebar-toggle-js",
+            #     style={"display": "none"}  # Hidden by default, shown via CSS
+            #     ),
+
          html.Img(
                 src=app.get_asset_url('images/Gracefield_logo.png'),
                 className="logo",
@@ -517,7 +525,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     fig_bar.update_layout(
         title=dict(text='⚡ Power Consumption by Location', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
         showlegend=False,
-        height=245,
+        height=210,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=28, b=8, l=20, r=20)
@@ -538,9 +546,9 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
         xaxis_title='Month',
         yaxis_title='Monthly_Consumption',
         template="plotly_white",
-        # showlegend=False,
-        width=520,
-        height=245,
+        showlegend=False,
+        width=500,
+        height=200,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=28, b=8, l=20, r=20)
@@ -645,7 +653,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     fig_pie.update_traces(textposition='inside', textinfo='percent+label')
     fig_pie.update_layout(
         title=dict(text='💸 Cost Breakdown (2025)', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
-        height=220,
+        height=210,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=28, b=8, l=8, r=8)
@@ -677,7 +685,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     # Place legend to the right of the chart and make it smaller so it doesn't overlap bars
     fig_fuel.update_layout(
         title=dict(text='⛽ Fuel Management', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
-        height=245,
+        height=210,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=28, b=8, l=20, r=120),
@@ -720,8 +728,8 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
         xaxis_title="Month",
         #yaxis_title="Total Duration (Hours, log scale)",
         template="plotly_white",
-        width=510,
-        height=250,
+        width=500,
+        height=210,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=28, b=40, l=40, r=160),
@@ -756,7 +764,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     # Move stock legend to the right and reduce its size to avoid overlap
     fig_stock.update_layout(
         title=dict(text='📦 Stock Inventory', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
-        height=245,
+        height=210,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=28, b=8, l=20, r=120),
@@ -794,7 +802,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     # Apply same pie chart styling as Tab-1 cost_pie
     fig_runtime.update_layout(
         title=dict(text='⏱️ Generator Runtime', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
-        height=220,
+        height=210,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=28, b=8, l=8, r=8)

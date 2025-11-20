@@ -29,21 +29,18 @@ html, body {
   height: 100%;
 }
 
-.app-grid{
-    grid-template-areas: 
-        "sidebar header"
-        "sidebar section";
-        
-
-
-    grid-template-columns: 1.3fr 6.2fr ;
-    grid-template-rows:  auto 1fr;
-    min-height: 100vh;
-    gap: 0;
-    display: grid;
-    height: 100vh; 
-    width: 100vw; /* Ensure full viewport width */
-    overflow: hidden; /* Prevent overall scrolling */
+.app-grid {
+  display: grid;
+  height: 100vh;                     /* full viewport height */
+  width: 100%;                       /* avoid 100vw issues with scrollbars */
+  gap: 0;
+  grid-template-columns: 1.3fr 6.2fr;
+  grid-template-rows: auto 1fr;      /* header takes natural height, section takes remaining */
+  grid-template-areas:
+    "sidebar header"
+    "sidebar section";
+  box-sizing: border-box;
+  overflow: hidden;                  /* prevent page-level double scrollbar */
 }
 
 .sidebar {
@@ -56,6 +53,7 @@ html, body {
 /* Content area below the header */
 .section {
     grid-area: section;
+   
 
 }
 
@@ -69,12 +67,13 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: space-evenly;
-    height: 75px;
+    max-height: 8rem;
     padding: 0 1rem;
     border-bottom: solid 2px #C7A64F;
     gap: 1rem;
     width: 100%;
     flex-shrink: 0;
+    overflow: hidden; /* Prevent header overflow */
 }
 
 /* .kpi-card {
@@ -95,7 +94,7 @@ html, body {
   gap: 5px;
 }
 .kpi-icon {
-    font-size: 32px;
+    font-size: 28px;
 }
 
 .kpi-text {
@@ -114,11 +113,17 @@ html, body {
 
 .kpi-value {
     margin: 4px 0 0 0;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     color: #111827;
 }
 
+.title {
+    font-size: 24px;
+    font-weight: 600;
+    color: #2C3E50;
+    margin: 0;
+}
 /* Sidebar control (dropdowns / buttons) - default spacing */
 .sidebar-control {
   width: 90%;
@@ -183,9 +188,7 @@ html, body {
     gap: 0.5rem;
     align-items: flex-start; /* Add this */
     min-width: 0;
-    overflow-y: auto; /* Only vertical scrolling if needed */
-    max-height: calc(100vh - 75px); /* Account for header height */
-    height: fit-content; /* Adjust to content */
+    height: 100%; /* Adjust to content */
 }
 
 
@@ -209,7 +212,7 @@ html, body {
   border: 1px solid #E8D5B7;
   position: relative;
   width: 500px;
-  height: 265px;
+  height: 255px;
 }
 
 /* Specific card widths with fallbacks */
@@ -239,7 +242,7 @@ html, body {
     transition: all 0.3s ease;
     border: 1px solid #E8D5B7;
     width:  610px;
-    height: 265px;
+    height: 255px;
     overflow: hidden;
 }
 
@@ -293,11 +296,11 @@ section h1, section h2, section h3 {
 
 
 
-.consumption-chart, .consumption-line, .cost-pie, 
+/* .consumption-chart, .consumption-line, .cost-pie, 
 .fuel-chart, .downtime-chart, .stock-chart, .runtime-chart {
     width: 100% !important;
     height: 100% !important;
-}
+} */
 
 /* Specifically for pie charts */
 .cost-pie, .runtime-chart {
@@ -326,3 +329,72 @@ section h1, section h2, section h3 {
     }
 }
 
+/* Add these to your existing CSS file */
+
+/* Sidebar Toggle Button */
+.sidebar-toggle-js {
+  display: none !important;
+  font-size: 20px !important;
+  background: #F4E4C1 !important;
+  border: 1px solid #C7A64F !important;
+  padding: 8px 12px !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  color: #2C3E50 !important;
+  margin-right: 15px !important;
+  position: absolute !important;
+  left: 15px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  z-index: 3000 !important;
+}
+
+/* Mobile Styles */
+@media (max-width: 992px) {
+  .sidebar-toggle-js { 
+    display: block !important; 
+  }
+  
+  .sidebar {
+    position: fixed !important;
+    z-index: 2000 !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 280px !important;
+    height: 100vh !important;
+    background: white !important;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1) !important;
+    transform: translateX(0) !important;
+    transition: transform 0.3s ease-in-out !important;
+    margin: 0 !important;
+    overflow-y: auto !important;
+  }
+  
+  .sidebar.collapsed {
+    transform: translateX(-100%) !important;
+    box-shadow: none !important;
+  }
+  
+  /* Adjust grid when sidebar collapses */
+  .app-grid {
+    grid-template-columns: 0fr 1fr !important;
+    transition: grid-template-columns 0.3s ease-in-out !important;
+  }
+  
+  /* Ensure header content doesn't get hidden by toggle button */
+  .header {
+    position: relative !important;
+    padding-left: 60px !important;
+  }
+}
+
+/* Hide toggle on desktop */
+@media (min-width: 993px) {
+  .sidebar-toggle-js { 
+    display: none !important; 
+  }
+  
+  .sidebar.collapsed {
+    transform: none !important;
+  }
+}
