@@ -284,15 +284,27 @@ gen_dropdown = dcc.Dropdown(
         )
 
 # Graph
-consChart = dcc.Graph(id='consumption_chart', className='consumption-chart')
-consumpLine = dcc.Graph(id='consumption_line', className='consumption-line')
-costPie = dcc.Graph(id='cost_pie', className='cost-pie')
+consChart = dcc.Graph(id='consumption_chart', config={"responsive": True},
+    style={"width": "100%", "height": "100%", "flex": "1 1 auto"}, className='consumption-chart')
+
+consumpLine = dcc.Graph(id='consumption_line', config={"responsive": True},
+    style={"width": "100%", "height": "100%", "flex": "1 1 auto"}, className='consumption-line')
+
+costPie = dcc.Graph(id='cost_pie', config={"responsive": True},
+    style={"width": "100%", "height": "100%", "flex": "1 1 auto"}, className='cost-pie')
 
 
-fuelChart = dcc.Graph(id='fuel_chart', className='fuel-chart')
-downtimeChart = dcc.Graph(id='downtime_chart', className='downtime-chart')
-stockChart = dcc.Graph(id='stock_chart', className='stock-chart')
-runtimeChart = dcc.Graph(id='runtime_chart', className='runtime-chart')
+fuelChart = dcc.Graph(id='fuel_chart', className='fuel-chart', config={"responsive": True},
+    style={"width": "100%", "height": "100%", "flex": "1 1 auto"})
+
+downtimeChart = dcc.Graph(id='downtime_chart', className='downtime-chart', config={"responsive": True},
+    style={"width": "100%", "height": "100%", "flex": "1 1 auto"})
+
+stockChart = dcc.Graph(id='stock_chart', className='stock-chart', config={"responsive": True},
+    style={"width": "100%", "height": "100%", "flex": "1 1 auto"})
+
+runtimeChart = dcc.Graph(id='runtime_chart', className='runtime-chart', config={"responsive": True},
+    style={"width": "100%", "height": "100%", "flex": "1 1 auto"})
 
 
 # (transactions table markup will be placed directly inside card-3 in the layout)
@@ -540,7 +552,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     fig_bar.update_layout(
         title=dict(text='⚡ Power Consumption by Location', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
         showlegend=False,
-        height=210,
+        autosize=True,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=28, b=8, l=20, r=20)
@@ -562,8 +574,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
         yaxis_title='Amount',
         template="plotly_white",
         showlegend=False,
-        width=488,
-        height=200,
+        autosize=True,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=28, b=8, l=20, r=20)
@@ -668,7 +679,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     fig_pie.update_traces(textposition='inside', textinfo='percent+label')
     fig_pie.update_layout(
         title=dict(text='💸 Cost Breakdown (2025)', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
-        height=210,
+        autosize=True,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=28, b=8, l=8, r=8)
@@ -700,7 +711,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     # Place legend to the right of the chart and make it smaller so it doesn't overlap bars
     fig_fuel.update_layout(
         title=dict(text='⛽ Fuel Management', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
-        height=210,
+        autosize=True,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=28, b=8, l=20, r=120),
@@ -743,8 +754,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
         xaxis_title="Month",
         #yaxis_title="Total Duration (Hours, log scale)",
         template="plotly_white",
-        width=500,
-        height=210,
+        autosize=True,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=28, b=40, l=40, r=160),
@@ -779,7 +789,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     # Move stock legend to the right and reduce its size to avoid overlap
     fig_stock.update_layout(
         title=dict(text='📦 Stock Inventory', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
-        height=210,
+        autosize=True,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=28, b=8, l=20, r=120),
@@ -817,7 +827,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     # Apply same pie chart styling as Tab-1 cost_pie
     fig_runtime.update_layout(
         title=dict(text='⏱️ Generator Runtime', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
-        height=210,
+        autosize=True,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=28, b=8, l=8, r=8)

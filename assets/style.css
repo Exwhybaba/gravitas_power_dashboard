@@ -199,7 +199,7 @@ html, body {
 }
 
 
-/* ---------- CARD ---------- */
+/* ---------- CARD (consolidated) ---------- */
 .card-1, .card-2, .card-3, .card-4 {
   background-color: #ffffff;
   border-radius: 16px;
@@ -211,19 +211,27 @@ html, body {
   transition: all 0.3s ease;
   border: 1px solid #E8D5B7;
   position: relative;
-  width: 500px;
-  height: 255px;
+
+  /* layout & sizing */
+  height: 260px;               /* desktop visual consistency */
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
 
-/* Specific card widths with fallbacks */
+/* Two-column desktop layout: primary cards wider (60%) and secondary cards narrower (38%) */
 .card-1, .card-3 {
-    width: 610px;
-    max-width: calc(50% - 1rem); /* Responsive constraint */
+  flex: 1 1 50%;          /* grow | shrink | basis */
+  max-width: 50%;
+  min-width: 260px;
+  box-sizing: border-box;
 }
 
 .card-2, .card-4 {
-    width: 500px;
-    max-width: calc(50% - 1rem); /* Responsive constraint */
+  flex: 1 1 47%;
+  max-width: 47%;
+  min-width: 240px;
+  box-sizing: border-box;
 }
 
 .card-3, .card-4{
@@ -309,6 +317,8 @@ section h1, section h2, section h3 {
 }
 
 
+
+
 /* Add media queries for smaller screens */
 @media (max-width: 1400px) {
     .card-1, .card-3 {
@@ -327,6 +337,16 @@ section h1, section h2, section h3 {
         width: 100%;
         max-width: 100%;
     }
+}
+
+/* Stack to single column on narrower viewports */
+@media (max-width: 1000px) {
+  .card-1, .card-2, .card-3, .card-4 {
+    flex: 1 1 100%;
+    max-width: 100%;
+    height: auto;         /* let content determine height on mobile */
+    min-height: 220px;
+  }
 }
 
 /* Add these to your existing CSS file */
