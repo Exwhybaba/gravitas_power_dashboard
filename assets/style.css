@@ -199,7 +199,7 @@ html, body {
 }
 
 
-/* ---------- CARD (consolidated) ---------- */
+/* ---------- CARD ---------- */
 .card-1, .card-2, .card-3, .card-4 {
   background-color: #ffffff;
   border-radius: 16px;
@@ -213,7 +213,6 @@ html, body {
   position: relative;
 
   /* layout & sizing */
-  height: 260px;               /* desktop visual consistency */
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -249,10 +248,15 @@ html, body {
     text-align: center;
     transition: all 0.3s ease;
     border: 1px solid #E8D5B7;
-    width:  610px;
-    height: 255px;
     overflow: hidden;
 }
+
+.card-1, .card-2, .card-3, .card-4 {
+    height: 43vh; /* 30% of the viewport height */
+    min-height: 220px; /* don't get too small */
+    max-height: 400px; /* optional upper limit */
+}
+
 
 #transactions_table {
     flex: 1; /* take remaining space in card */
