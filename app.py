@@ -40,10 +40,10 @@ def load_all_data():
 
                 ## Cost Break_Down
                 df_cost = df.parse(1)
-                df_cost.at[125, 'Rate'] = 127000
-                df_cost.at[125, 'Amount (NGN)'] = 127000
-                df_cost.at[126, 'Rate'] = 127000
-                df_cost.at[126, 'Amount (NGN)'] = 127000
+                # df_cost.at[125, 'Rate'] = 127000
+                # df_cost.at[125, 'Amount (NGN)'] = 127000
+                # df_cost.at[126, 'Rate'] = 127000
+                # df_cost.at[126, 'Amount (NGN)'] = 127000
 
                 df_cost['Generator'].replace(['new 80kva', 'both 80kva', 'old 80kva', 'new 200kva', '55Kva'],
                                          ['80kva', '80kva', '80kva',  '200kva', '55kva' ], inplace= True)
@@ -82,8 +82,6 @@ def load_all_data():
 
                 # Fuel Supplied
                 df_supplied = df.parse(3)
-                df_supplied.at[1, 'Total Fuel Used'] = 4200
-                df_supplied.at[1, 'Fuel Added (Total)'] = 3000
                 df_supplied.drop(index=10, inplace=True, errors='ignore')
 
                 df_supplied['Date'] = pd.to_datetime(df_supplied['Date'])
@@ -161,7 +159,7 @@ metr_loc = dcc.Dropdown(
 # Month filter
 mtr_month = dcc.Dropdown(
         id='month_filter',
-        options=[{"label": m, "value": m} for m in df_meter["Month"].unique()],
+        options=[{"label": m, "value": m} for m in run_time["Month"].unique()],
         placeholder="Select Month",
         multi=True,
         style={'width': '90%', 'marginTop': '30%', "marginLeft": "5%"}
@@ -446,7 +444,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
         xaxis_title='Month',
         yaxis_title='Amount',
         template="plotly_white",
-        showlegend=False,
+        #showlegend=False,
         autosize=True,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
@@ -488,6 +486,14 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
         ).fillna('-').reset_index()
     else:
         pivot = pd.DataFrame(columns=['Meter Number'])
+
+    # ---- ROUND TO 2 SIGNIFICANT FIGURES ----
+    cols_to_format = [col for col in pivot.columns if col != "Meter Number"]
+
+    pivot[cols_to_format] = pivot[cols_to_format].applymap(
+        lambda x: f"{x:.2f}" if isinstance(x, (int, float)) else x
+    )
+
 
     table_data = pivot.to_dict('records')
     table_columns = [{"name": str(col), "id": str(col)} for col in pivot.columns]
