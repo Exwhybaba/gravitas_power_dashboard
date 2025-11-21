@@ -76,6 +76,7 @@ def load_all_data():
                 run_time['Date'] = pd.to_datetime(run_time['Date'])
                 run_time['Month'] = run_time['Date'].dt.strftime('%B')
                 run_time['Day'] = run_time['Date'].dt.strftime('%A')
+                run_time['Generator'].replace(['20KVA', '200KVA', '80KVA', '55KVA'], ['20kva', '200kva', '80kva', '55kva'], inplace = True)
                 df_agg = run_time.groupby(['Month', 'Generator'], as_index=False)['Hours Operated'].sum()
                 df_agg['Month'] = pd.Categorical(df_agg['Month'], categories=month_order, ordered=True)
                 df_agg = df_agg.sort_values(by='Month')
@@ -87,25 +88,27 @@ def load_all_data():
                 df_supplied['Date'] = pd.to_datetime(df_supplied['Date'])
                 df_supplied['Month'] = df_supplied['Date'].dt.strftime('%B')
 
+                
                 ## Stock
                 df_stock = df.parse(5)
                 df_stock['Total Available Stock'] = df_stock['Opening_Stock'] + df_stock['Purchased_Stock']
                 df_stock.rename(columns={"Month": "Date"}, inplace=True)
                 df_stock['Month'] = pd.to_datetime(df_stock['Date']).dt.strftime('%B')
 
-                # Aggregate by Generator_Size + Filter_Type
-                df_rc = df_stock.groupby(['Generator_Size','Filter_Type'], as_index=False).agg({
-                    'Consumed_Stock':'sum',
-                    'Remaining_Stock':'sum'
-                })
+                # pick the last record per Month, Generator_Size and Filter_Type
+                df_rc = df_stock.sort_values('Date').groupby(
+                    ['Month', 'Generator_Size', 'Filter_Type'], as_index=False
+                ).last()[['Month', 'Generator_Size','Filter_Type','Consumed_Stock','Remaining_Stock']]
 
-                # Melt for stacked plotting
+                # Melt for stacked bar plotting (Month included)
                 df_rc_melt = df_rc.melt(
-                    id_vars=['Generator_Size','Filter_Type'],
+                    id_vars=['Month','Generator_Size','Filter_Type'],  
                     value_vars=['Consumed_Stock','Remaining_Stock'],
                     var_name='Stock_Status',
                     value_name='Units'
                 )
+
+
 
                 ## Power Transaction
                 path2 = "https://docs.google.com/spreadsheets/d/1O-mPctFgp6oqd-VK9YKHyPq-asuve2ZM/export?format=xlsx"
@@ -168,7 +171,7 @@ mtr_month = dcc.Dropdown(
 # Generator dropdown
 gen_dropdown = dcc.Dropdown(
         id='generator_type',
-        options=[{"label": gen, "value": gen} for gen in sorted(df_cost_2025["Generator"].unique())],
+        options=[{"label": gen, "value": gen} for gen in sorted(run_time["Generator"].unique())],
         placeholder="Select Generator Type",
         multi=True,
         style={'width': '90%', 'marginTop': '30%', "marginLeft": "5%"}
@@ -637,7 +640,17 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
         )
     )
 
+   
     # --- Stock Chart (Tab-2) with brand colors ---
+    if selected_months:
+        local_df_rc_melt = local_df_rc_melt[local_df_rc_melt['Month'].isin(selected_months)]
+
+    if selected_generators:
+        local_df_rc_melt = local_df_rc_melt[local_df_rc_melt['Generator_Size'].isin(selected_generators)]
+       
+    
+    print(local_df_rc_melt)
+
     if not local_df_rc_melt.empty:
         fig_stock = px.bar(
             local_df_rc_melt,
@@ -668,6 +681,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
             borderwidth=0
         )
     )
+
 
     # --- Runtime Chart (Tab-2) ---
     filtered_runtime = local_df_agg.copy()
