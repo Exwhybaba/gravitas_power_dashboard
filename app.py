@@ -6,6 +6,8 @@ import pandas as pd
 from dash import Dash, dcc, html, Input, Output, callback_context
 import os
 import warnings
+import calendar
+from collections import Counter
 import threading
 from datetime import datetime, timedelta
 
@@ -169,13 +171,18 @@ mtr_month = dcc.Dropdown(
     )
 
 # Generator dropdown
+# safe generator options (drop missing values and sort by string)
+gens = run_time['Generator'].dropna().astype(str).unique().tolist()
+gens = sorted(gens, key=lambda x: x.lower())  # case-insensitive sort
+
 gen_dropdown = dcc.Dropdown(
-        id='generator_type',
-        options=[{"label": gen, "value": gen} for gen in sorted(run_time["Generator"].unique())],
-        placeholder="Select Generator Type",
-        multi=True,
-        style={'width': '90%', 'marginTop': '30%', "marginLeft": "5%"}
-        )
+    id='generator_type',
+    options=[{"label": gen, "value": gen} for gen in gens],
+    placeholder="Select Generator Type",
+    multi=True,
+    style={'width': '90%', 'marginTop': '30%', "marginLeft": "5%"}
+)
+
 
 # Graph components
 consChart = dcc.Graph(id='consumption_chart', config={"responsive": True},
@@ -701,7 +708,6 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
             color_discrete_sequence=brand_colors,
             hole=0.4
         )
-        fig_runtime.update_traces(textposition="inside", textinfo="percent+label")
     else:
         # Create empty pie chart if no data
         fig_runtime = px.pie(
@@ -710,7 +716,10 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
             color_discrete_sequence=brand_colors,
             hole=0.4
         )
-    fig_runtime.update_traces(textposition="inside", textinfo="label")
+
+    # Show percent + label inside slices
+    fig_runtime.update_traces(textposition="inside", textinfo="percent+label")
+
 
     fig_runtime.update_layout(
         title=dict(text='⏱️ Generator Runtime', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
@@ -720,27 +729,128 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
         margin=dict(t=28, b=8, l=8, r=8)
     )
 
-    # Calculate Operated Hours and Planned Outage
-    operated_hours = filtered_runtime['Hours Operated'].sum()
-    
-    total_hours_available = 0
+    # === Operated Hours + Planned Outage Calculation ===
+    filtered_runtime = local_df_agg.copy()
     if selected_months:
-        filtered_months = selected_months if isinstance(selected_months, list) else [selected_months]
-        days_in_month = {
-            'January': 31, 'February': 28, 'March': 31, 'April': 30,
-            'May': 31, 'June': 30, 'July': 31, 'August': 31,
-            'September': 30, 'October': 31, 'November': 30, 'December': 31
+        filtered_runtime = filtered_runtime[filtered_runtime['Month'].isin(selected_months)]
+    if selected_generators:
+        filtered_runtime = filtered_runtime[filtered_runtime['Generator'].isin(selected_generators)]
+
+    # Get actual operated hours from the data
+    actual_operated_hours = filtered_runtime['Hours Operated'].sum()
+
+    # Define daily generator schedule based on the day of week
+    # Weekday mapping: 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday, 4=Friday, 5=Saturday, 6=Sunday
+    daily_schedule = {
+        0: {  # Monday
+            "80kva": 11,      # 7AM - 6PM
+            "55kva": 12,      # 7PM Monday - 7AM Tuesday
+        },
+        1: {  # Tuesday
+            "80kva": 11,      # 7AM - 6PM
+            "55kva": 12,      # 7PM Tuesday - 7AM Wednesday
+        },
+        2: {  # Wednesday
+            "80kva": 11,      # 7AM - 6PM
+            "55kva": 12,      # 7PM Wednesday - 7AM Thursday
+        },
+        3: {  # Thursday
+            "80kva": 11,      # 7AM - 6PM
+            "55kva": 12,      # 7PM Thursday - 7AM Friday
+        },
+        4: {  # Friday
+            "80kva": 11,      # 7AM - 6PM
+            "55kva": 19.5,    # 7PM Friday - 2:30PM Saturday
+        },
+        5: {  # Saturday
+            "55kva": 12,      # 7PM Saturday - 7AM Sunday
+        },
+        6: {  # Sunday
+            "200kva": 7,      # 7AM - 2PM
+            "55kva": 12,      # 7PM Sunday - 7AM Monday
         }
-        for month in filtered_months:
-            total_hours_available += days_in_month.get(month, 30) * 24
+    }
+
+    # Determine the date range based on selected months
+    if selected_months:
+        months = selected_months if isinstance(selected_months, list) else [selected_months]
+        # Convert month names to numbers
+        month_nums = [list(calendar.month_name).index(m) for m in months]
+        start_month = min(month_nums)
+        end_month = max(month_nums)
+        year = 2025
+        
+        # Get first day of first month and last day of last month
+        start_date = datetime(year, start_month, 1)
+        last_day = calendar.monthrange(year, end_month)[1]
+        end_date = datetime(year, end_month, last_day)
     else:
-        total_hours_available = len(local_df_agg['Month'].unique()) * 30 * 24
-    
-    planned_outage = max(0, total_hours_available - operated_hours)
+        # If no month selected, use entire year
+        start_date = datetime(2025, 1, 1)
+        end_date = datetime(2025, 12, 31)
+
+    # Generate all dates in the range and count each weekday occurrence
+    date_range = pd.date_range(start_date, end_date, freq='D')
+    weekday_counts = Counter(date_range.weekday)
+
+    # Calculate total scheduled hours
+    total_scheduled_hours = 0.0
+    scheduled_breakdown = {}
+
+    for weekday, count in weekday_counts.items():
+        day_schedule = daily_schedule.get(weekday, {})
+        
+        for gen, hours_per_day in day_schedule.items():
+            # Skip if this generator is not in the selected filter
+            if selected_generators and gen not in selected_generators:
+                continue
+            
+            # Calculate scheduled hours for this generator on this weekday
+            scheduled_hours = count * hours_per_day
+            total_scheduled_hours += scheduled_hours
+            
+            # Track breakdown for debugging
+            day_name = calendar.day_name[weekday]
+            key = f"{gen}_{day_name}"
+            scheduled_breakdown[key] = scheduled_hours
+
+    # Calculate total hours available in the period
+    total_days = (end_date - start_date).days + 1
+    total_hours_in_period = total_days * 24
+
+    # Planned outage = Total hours - Operated hours
+    planned_outage_hours = max(total_hours_in_period - actual_operated_hours, 0)
+
+    # Format for display
+    operated_hours_display = f"{actual_operated_hours:,.0f}h"
+    planned_outage_display = f"{planned_outage_hours:,.0f}h"
+
+    # Debug print (optional - detailed breakdown)
+    # print(f"\n{'='*60}")
+    # print(f"Period: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+    # print(f"{'='*60}")
+    # print(f"Weekday Distribution:")
+    # for weekday in range(7):
+    #     day_name = calendar.day_name[weekday]
+    #     count = weekday_counts.get(weekday, 0)
+    #     print(f"  {day_name:10s}: {count} days")
+
+    # print(f"\nScheduled Hours Breakdown:")
+    # for key, hours in sorted(scheduled_breakdown.items()):
+    #     print(f"  {key:20s}: {hours:6.1f}h")
+
+    # print(f"\n{'='*60}")
+    # print(f"Total Days in Period    : {total_days}")
+    # print(f"Total Hours Available   : {total_hours_in_period:,}h")
+    # print(f"Total Scheduled Hours   : {total_scheduled_hours:,.1f}h")
+    # print(f"Actual Operated Hours   : {actual_operated_hours:,.0f}h")
+    # print(f"Planned Outage Hours    : {planned_outage_hours:,.0f}h")
+    # print(f"{'='*60}\n")
+
 
     return (fig_bar, fig_line, table_data, table_columns, 
         gravitas_revenue, gravitas_subs_revenue, 
-        f"{operated_hours:,.0f}h", f"{planned_outage:,.0f}h",
+        operated_hours_display, planned_outage_display,
         fig_pie, fig_fuel, fig_down, fig_stock, fig_runtime)
 
 if __name__ == "__main__":
