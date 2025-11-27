@@ -148,8 +148,8 @@ load_all_data()
 all_locations = sorted(list(set(
     list(df_meter["Location"].unique()) +
     ['Rosewood', 'Cedar A', 'Tuck-shop', 'Cedar B',
-     'Gravitas Head Office', 'Engineering Yard', 'NBIC 2', 'NBIC 1',
-     'HELIUM ', 'DIC']
+     'Head Office', 'Engineering Yard', 'NBIC 2', 'NBIC 1',
+     'HELIUM', 'DIC']
 )))
 
 # Location filter (now includes both meter locations and transaction addresses)
@@ -420,8 +420,9 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     # --- Bar chart with brand-aligned color palette ---
     brand_colors = ['#C7A64F', '#2C3E50', "#5E7286", '#F4E4C1', '#E8D5B7']
     
+    meter_grouped = filtered_meter.groupby('Location', as_index=False)['Monthly_Consumption'].sum()
     fig_bar = px.bar(
-        filtered_meter,
+        meter_grouped,
         x='Location',
         y='Monthly_Consumption',
         color='Location',
@@ -476,10 +477,17 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     table_df.loc[table_df['Meter Number'] == 23220035788, "Resident Address"] = 'Rosewood'
     table_df.loc[table_df['Meter Number'] == 4293682789, "Resident Address"] = 'NBIC 2' 
 
-    mask = (table_df['Resident Address'] == 'C A') & (table_df['Meter Number'] == 4293684496)
+    table_df['Resident Address'] = table_df['Resident Address'].replace(['C A','Bites To Eat [Tuck-shop]',
+                                                'Gravitas Head Office', 'Gravitas Engineering Yard', 'HELIUM '],
+                                                ['Cedar A', 'Tuck-shop', 'Head Office', 'Engineering Yard', 'HELIUM'])
+    
+
+    mask = (table_df['Resident Address'] == 'Cedar A') & (table_df['Meter Number'] == 4293684496)
     if not table_df.loc[mask].empty:
         min_index = table_df.loc[mask, 'Amount'].idxmin()
         table_df.loc[min_index, 'Resident Address'] = 'Cedar B'
+
+    
 
     # Filter by selected location/address
     if selected_locations:
@@ -487,13 +495,19 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
         table_df = table_df[table_df['Resident Address'].isin(locations_selected)]
 
     if not table_df.empty:
-        pivot = pd.pivot_table(
-            table_df,
-            values='Amount',
-            index='Meter Number',
-            columns='Resident Address',
-            aggfunc='sum'
-        ).fillna('-').reset_index()
+        # Use the same approach as your Jupyter notebook
+        pivot_list = []
+        for col in table_df['Resident Address'].unique():
+            temp = pd.pivot_table(
+                table_df[table_df["Resident Address"] == col],
+                values="Amount",
+                index="Meter Number",
+                columns="Resident Address",
+                aggfunc="sum"
+            )
+            pivot_list.append(temp)
+        
+        pivot = pd.concat(pivot_list, axis=0).fillna('-').reset_index()
     else:
         pivot = pd.DataFrame(columns=['Meter Number'])
 
@@ -504,6 +518,14 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
         lambda x: f"{x:.2f}" if isinstance(x, (int, float)) else x
     )
 
+    # pivot.rename(columns={
+    #     'C A': 'Cedar A',
+    #     'Gravitas Engineering Yard': 'Engineering Yard',
+    #     'Gravitas Head Office': 'Head Office',
+    #     'Bites To Eat [Tuck-shop]': 'Tuck-shop'
+    # }, inplace=True)
+
+    # print(pivot.columns)
 
     table_data = pivot.to_dict('records')
     table_columns = [{"name": str(col), "id": str(col)} for col in pivot.columns]
@@ -516,8 +538,8 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
             return pd.to_numeric(df_table[col].replace('-', 0), errors='coerce').sum()
         return 0
 
-    gho = safe_sum("Gravitas Head Office")
-    gey = safe_sum("Gravitas Engineering Yard")
+    gho = safe_sum("Head Office")
+    gey = safe_sum("Engineering Yard")
 
     total_gravitas = gho + gey + gravitas_partner
     gravitas_revenue = f"₦{total_gravitas:,.0f}"
@@ -525,8 +547,8 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     # --- Subscriber Revenue ---
     df_table.columns = df_table.columns.str.strip().str.replace('\u00A0', '', regex=True)
 
-    columns_to_sum = ['C A', 'DIC', 'NBIC 1', 'NBIC 2', 'HELIUM', 
-                    'Rosewood', 'Bites To Eat [Tuck-shop]', 'Cedar B']
+    columns_to_sum = ['Cedar A', 'DIC', 'NBIC 1', 'NBIC 2', 'HELIUM', 
+                    'Rosewood', 'Tuck-shop', 'Cedar B']
 
     existing_cols = [c for c in columns_to_sum if c in df_table.columns]
 
@@ -655,9 +677,6 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     if selected_generators:
         local_df_rc_melt = local_df_rc_melt[local_df_rc_melt['Generator_Size'].isin(selected_generators)]
        
-    
-
-
     if not local_df_rc_melt.empty:
         fig_stock = px.bar(
             local_df_rc_melt,
