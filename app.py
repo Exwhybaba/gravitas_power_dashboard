@@ -255,9 +255,9 @@ app.layout = html.Div([
         metr_loc, 
         gen_dropdown,
         html.Button("Power Analytics", id="tab1-btn", className="tab-btn active-tab", 
-                   style={"marginLeft": "0.5rem", "marginTop": "4rem"}),
+                   style={"marginLeft": "1.5rem", "marginTop": "4rem"}),
         html.Button("Operations", id="tab2-btn", className="tab-btn",
-                   style={"marginLeft": "0.8rem", "marginTop": "4rem"})
+                   style={"marginLeft": "1.5rem", "marginTop": "4rem"})
     ], className="sidebar"),
     
     html.Div([
