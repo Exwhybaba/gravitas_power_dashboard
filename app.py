@@ -426,6 +426,11 @@ def update_chart(selected_locations, selected_months, selected_generators, selec
         margin=dict(t=28, b=8, l=20, r=20)
     )
 
+    fig_bar.update_traces(
+    texttemplate='%{y}',
+    textposition='inside'
+)
+
     # --- Line chart with brand colors ---
     fig_line = px.line(
         filtered_meter,
@@ -806,6 +811,7 @@ def update_chart(selected_locations, selected_months, selected_generators, selec
         )
     )
 
+    
 
 
     fig_stock.update_xaxes(tickangle=-45)
