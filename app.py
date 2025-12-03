@@ -42,11 +42,6 @@ def load_all_data():
 
                 ## Cost Break_Down
                 df_cost = df.parse(1)
-                # df_cost.at[125, 'Rate'] = 127000
-                # df_cost.at[125, 'Amount (NGN)'] = 127000
-                # df_cost.at[126, 'Rate'] = 127000
-                # df_cost.at[126, 'Amount (NGN)'] = 127000
-
                 df_cost['Generator'].replace(['new 80kva', 'both 80kva', 'old 80kva', 'new 200kva', '55Kva'],
                                          ['80kva', '80kva', '80kva',  '200kva', '55kva' ], inplace= True)
 
@@ -85,37 +80,35 @@ def load_all_data():
 
                 # Fuel Supplied
                 df_supplied = df.parse(3)
-                # df_supplied.drop(index=10, inplace=True, errors='ignore')
 
                 df_supplied['Date'] = pd.to_datetime(df_supplied['Date'])
                 df_supplied['Month'] = df_supplied['Date'].dt.strftime('%B')
 
                 
+                
                 ## Stock
                 df_stock = df.parse(5)
-                df_stock['Total Available Stock'] = df_stock['Opening_Stock'] + df_stock['Purchased_Stock']
-                df_stock.rename(columns={"Month": "Date"}, inplace=True)
-                df_stock['Month'] = pd.to_datetime(df_stock['Date']).dt.strftime('%B')
+                # Convert Month column to month names for filtering
+                df_stock['Month'] = pd.to_datetime(df_stock['Month']).dt.strftime('%B')
+                df_rc_melt = df_stock.copy()
 
-                # pick the last record per Month, Generator_Size and Filter_Type
-                df_rc = df_stock.sort_values('Date').groupby(
-                    ['Month', 'Generator_Size', 'Filter_Type'], as_index=False
-                ).last()[['Month', 'Generator_Size','Filter_Type','Consumed_Stock','Remaining_Stock']]
+                # # pick the last record per Month, Generator_Size and Filter_Type
+                # df_rc = df_stock.sort_values('Date').groupby(
+                #     ['Month', 'Generator_Size', 'Filter_Type'], as_index=False
+                # ).last()[['Month', 'Generator_Size','Filter_Type','Consumed_Stock','Remaining_Stock']]
 
-                # Melt for stacked bar plotting (Month included)
-                df_rc_melt = df_rc.melt(
-                    id_vars=['Month','Generator_Size','Filter_Type'],  
-                    value_vars=['Consumed_Stock','Remaining_Stock'],
-                    var_name='Stock_Status',
-                    value_name='Units'
-                )
-
-
+                # # Melt for stacked bar plotting (Month included)
+                # df_rc_melt = df_rc.melt(
+                #     id_vars=['Month','Generator_Size','Filter_Type'],  
+                #     value_vars=['Consumed_Stock','Remaining_Stock'],
+                #     var_name='Stock_Status',
+                #     value_name='Units'
+                # )
 
                 ## Power Transaction
-                # path2 = "https://docs.google.com/spreadsheets/d/1O-mPctFgp6oqd-VK9YKHyPq-asuve2ZM/export?format=xlsx"
-                # df2 = pd.ExcelFile(path2)
                 power_df = df.parse(6)
+                # print(power_df.duplicated())
+                power_df = power_df.drop_duplicates(subset=power_df.columns.difference(['Trnx. Reference']), keep='first')
 
                 # Convert Transaction Date to string first to handle mixed types, then to datetime
                 try:
@@ -152,10 +145,12 @@ all_locations = sorted(list(set(
      'HELIUM', 'DIC']
 )))
 
+#subsName = ['Rosewood', 'Cedar A', 'Cedar B']
 # Location filter (now includes both meter locations and transaction addresses)
 metr_loc = dcc.Dropdown(
         id='location_filter',
         options=[{"label": loc, "value": loc} for loc in all_locations],
+        #value=[{}]
         placeholder="Select Location",
         multi=True,
         style={'width': '90%', 'marginTop': '30%', "marginLeft": "5%"}
@@ -175,10 +170,22 @@ mtr_month = dcc.Dropdown(
 gens = run_time['Generator'].dropna().astype(str).unique().tolist()
 gens = sorted(gens, key=lambda x: x.lower())  # case-insensitive sort
 
+
+filter = df_rc_melt['Filter_Type'].unique().tolist()
+
+
 gen_dropdown = dcc.Dropdown(
     id='generator_type',
     options=[{"label": gen, "value": gen} for gen in gens],
     placeholder="Select Generator Type",
+    multi=True,
+    style={'width': '90%', 'marginTop': '30%', "marginLeft": "5%"}
+)
+
+filter_dropdown = dcc.Dropdown(
+    id='filter_type',
+    options=[{"label": fil, "value": fil} for fil in filter],
+    placeholder="Filter Type",
     multi=True,
     style={'width': '90%', 'marginTop': '30%', "marginLeft": "5%"}
 )
@@ -206,38 +213,9 @@ stockChart = dcc.Graph(id='stock_chart', className='stock-chart', config={"respo
 runtimeChart = dcc.Graph(id='runtime_chart', className='runtime-chart', config={"responsive": True},
     style={"width": "100%", "height": "100%", "flex": "1 1 auto"})
 
+transChart = dcc.Graph(id='trans_chart', className='trans-chart', config={"responsive": True},
+    style={"width": "100%", "height": "100%", "flex": "1 1 auto"})
 
-# Transactions table
-transTable = dash_table.DataTable(
-                id='transactions_table',
-                columns=[{"name": "Meter Number", "id": "Meter Number"}],
-                data=[],
-                page_size=8,
-                fixed_rows={'headers': True},
-                style_table={'overflowX': 'auto', 'height': '90%', 'width': '98%'},
-                style_header={
-                    'backgroundColor': '#f7f9fc',
-                    'fontWeight': '20',
-                    'borderBottom': '1px solid #ddd',
-                    'fontSize': '12px'
-                },
-                style_cell={
-                    'textAlign': 'left',
-                    'padding': '4px',
-                    'whiteSpace': 'normal',
-                    'height': 'auto',
-                    'minWidth': '25px',
-                    'maxWidth': '150px',
-                    'overflow': 'hidden',
-                    'textOverflow': 'ellipsis'
-                },
-                css=[
-                    {
-                        'selector': '.dash-table-container .dash-spreadsheet-container',
-                        'rule': 'height: calc(100% - 36px) !important;'
-                    }
-                ]
-            )
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server
@@ -254,6 +232,7 @@ app.layout = html.Div([
         mtr_month,
         metr_loc, 
         gen_dropdown,
+        filter_dropdown,
         html.Button("Power Analytics", id="tab1-btn", className="tab-btn active-tab", 
                    style={"marginLeft": "1.5rem", "marginTop": "4rem"}),
         html.Button("Operations", id="tab2-btn", className="tab-btn",
@@ -305,7 +284,7 @@ app.layout = html.Div([
         ], className="card-2"),
 
         html.Div([
-            transTable
+            transChart
         ], className="card-3"),
 
         html.Div([
@@ -365,8 +344,7 @@ def switch_tabs(tab1_clicks, tab2_clicks):
     [
         Output('consumption_chart', 'figure'),
         Output('consumption_line', 'figure'),
-        Output('transactions_table', 'data'),
-        Output('transactions_table', 'columns'),
+        Output('trans_chart', 'figure'),
         Output('gravitas_revenue', 'children'),
         Output('subs_revenue', 'children'),
         Output('operated_hours', 'children'),
@@ -381,10 +359,12 @@ def switch_tabs(tab1_clicks, tab2_clicks):
         Input('location_filter', 'value'),
         Input('month_filter', 'value'),
         Input('generator_type', 'value'),
+        Input('filter_type', 'value'),
         Input('data-refresh-interval', 'n_intervals'),
-    ]
+    ],
+   
 )
-def update_chart(selected_locations, selected_months, selected_generators, n_intervals):
+def update_chart(selected_locations, selected_months, selected_generators, selected_filter, n_intervals):
     # Load/refresh data with thread safety
     load_all_data()
     
@@ -419,6 +399,8 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     
     # --- Bar chart with brand-aligned color palette ---
     brand_colors = ['#C7A64F', '#2C3E50', "#5E7286", '#F4E4C1', '#E8D5B7']
+    # brand_colors = ["#BFC74F",  '#2C3E50', "#44494F",  '#D4912A', '#1ABC9C' ]
+    # brand_colors2 = ['#f6f5ae', '#728e98', '#efc5da', '#ea9278', '#edebe8']
     
     meter_grouped = filtered_meter.groupby('Location', as_index=False)['Monthly_Consumption'].sum()
     fig_bar = px.bar(
@@ -455,7 +437,6 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
         xaxis_title='Month',
         yaxis_title='Amount',
         template="plotly_white",
-        #showlegend=False,
         autosize=True,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
@@ -465,7 +446,104 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     # Style the line traces with gold tones
     fig_line.update_traces(line=dict(width=2.5))
 
-    # --- Transactions table ---
+    # --- Transactions Chart (replacing table) ---
+    chart_df = local_power_df.copy()
+
+    # Filter by month
+    if selected_months:
+        months_selected = selected_months if isinstance(selected_months, list) else [selected_months]
+        chart_df = chart_df[chart_df['Month'].isin(months_selected)]
+
+    # Fix addresses to match the corrected names
+    chart_df.loc[chart_df['Meter Number'] == 23220035788, "Resident Address"] = 'Rosewood'
+    chart_df.loc[chart_df['Meter Number'] == 4293682789, "Resident Address"] = 'NBIC 2' 
+
+    chart_df['Resident Address'] = chart_df['Resident Address'].replace(['C A','Bites To Eat [Tuck-shop]',
+                                                'Gravitas Head Office', 'Gravitas Engineering Yard', 'HELIUM '],
+                                                ['Cedar A', 'Tuck-shop', 'Head Office', 'Engineering Yard', 'HELIUM'])
+    
+
+    mask = (chart_df['Resident Address'] == 'Cedar A') & (chart_df['Meter Number'] == 4293684496)
+    if not chart_df.loc[mask].empty:
+        min_index = chart_df.loc[mask, 'Amount'].idxmin()
+        chart_df.loc[min_index, 'Resident Address'] = 'Cedar B'
+
+    # EXCLUDE Engineering Yard, Head Office, and Tuck-shop
+    chart_df = chart_df[~chart_df['Resident Address'].isin(['Engineering Yard', 'Head Office', 'Tuck-shop'])]
+
+    # Filter by selected location/address
+    if selected_locations:
+        locations_selected = selected_locations if isinstance(selected_locations, list) else [selected_locations]
+        chart_df = chart_df[chart_df['Resident Address'].isin(locations_selected)]
+
+    # Group by Resident Address and sum the amounts
+    # Group by Month and Resident Address to show trends over time
+    if not chart_df.empty:
+        # Group by both Month and Resident Address to get monthly trends
+        month_order = ["January","February","March","April","May","June","July","August","September","October","November","December"]
+        
+        address_monthly = chart_df.groupby(['Month', 'Resident Address'], as_index=False)['Amount'].sum()
+        
+        # Get top 5 locations by total revenue
+        top_5_locations = address_monthly.groupby('Resident Address')['Amount'].sum().nlargest(4).index
+       
+        
+        # Filter for only top 5 locations
+        address_monthly = address_monthly[address_monthly['Resident Address'].isin(top_5_locations)]
+        
+        # Ensure months are in correct order
+        address_monthly['Month'] = pd.Categorical(address_monthly['Month'], categories=month_order, ordered=True)
+        address_monthly = address_monthly.sort_values('Month')
+        
+
+        
+        # Create line chart
+        fig_trans = px.line(
+            address_monthly,
+            x='Month',
+            y='Amount',
+            color='Resident Address',
+            markers=True,
+            labels={'Amount': 'Revenue (₦)', 'Resident Address': 'Location', 'Month': 'Month'},
+            color_discrete_sequence=brand_colors
+        )
+        
+        # Style the line traces
+        fig_trans.update_traces(line=dict(width=2.5), marker=dict(size=8))
+        
+        fig_trans.update_layout(
+            title=dict(text='💰 Top 5 Locations - Revenue Trend', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
+            autosize=True,
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            margin=dict(t=28, b=8, l=20, r=120),
+            xaxis_title='',
+            yaxis_title='Revenue (₦)',
+            template="plotly_white",
+            legend=dict(
+                orientation='v',
+                x=1.02,
+                xanchor='left',
+                y=1,
+                yanchor='top',
+                font=dict(size=10),
+                bgcolor='rgba(0,0,0,0)',
+                borderwidth=0,
+                title=dict(text='Location')
+            )
+        )
+        
+        fig_trans.update_xaxes(tickangle=-45)
+    else:
+        # Empty chart if no data
+        fig_trans = px.line(title="No transaction data available")
+        fig_trans.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            margin=dict(t=28, b=8, l=20, r=20)
+        )
+
+    # --- Calculate revenues for KPIs ---
     table_df = local_power_df.copy()
 
     # Filter by month
@@ -473,7 +551,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
         months_selected = selected_months if isinstance(selected_months, list) else [selected_months]
         table_df = table_df[table_df['Month'].isin(months_selected)]
 
-    # Fix addresses to match the corrected names
+    # Fix addresses
     table_df.loc[table_df['Meter Number'] == 23220035788, "Resident Address"] = 'Rosewood'
     table_df.loc[table_df['Meter Number'] == 4293682789, "Resident Address"] = 'NBIC 2' 
 
@@ -481,13 +559,10 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
                                                 'Gravitas Head Office', 'Gravitas Engineering Yard', 'HELIUM '],
                                                 ['Cedar A', 'Tuck-shop', 'Head Office', 'Engineering Yard', 'HELIUM'])
     
-
     mask = (table_df['Resident Address'] == 'Cedar A') & (table_df['Meter Number'] == 4293684496)
     if not table_df.loc[mask].empty:
         min_index = table_df.loc[mask, 'Amount'].idxmin()
         table_df.loc[min_index, 'Resident Address'] = 'Cedar B'
-
-    
 
     # Filter by selected location/address
     if selected_locations:
@@ -495,7 +570,6 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
         table_df = table_df[table_df['Resident Address'].isin(locations_selected)]
 
     if not table_df.empty:
-        # Use the same approach as your Jupyter notebook
         pivot_list = []
         for col in table_df['Resident Address'].unique():
             temp = pd.pivot_table(
@@ -511,26 +585,13 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     else:
         pivot = pd.DataFrame(columns=['Meter Number'])
 
-    # ---- ROUND TO 2 SIGNIFICANT FIGURES ----
+    # Format to 2 decimal places
     cols_to_format = [col for col in pivot.columns if col != "Meter Number"]
-
     pivot[cols_to_format] = pivot[cols_to_format].applymap(
         lambda x: f"{x:.2f}" if isinstance(x, (int, float)) else x
     )
 
-    # pivot.rename(columns={
-    #     'C A': 'Cedar A',
-    #     'Gravitas Engineering Yard': 'Engineering Yard',
-    #     'Gravitas Head Office': 'Head Office',
-    #     'Bites To Eat [Tuck-shop]': 'Tuck-shop'
-    # }, inplace=True)
-
-    # print(pivot.columns)
-
-    table_data = pivot.to_dict('records')
-    table_columns = [{"name": str(col), "id": str(col)} for col in pivot.columns]
-
-    df_table = pd.DataFrame(table_data)
+    df_table = pd.DataFrame(pivot.to_dict('records'))
 
     # --- Gravitas Partner Revenue ---
     def safe_sum(col):
@@ -596,16 +657,20 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     
     filtered_fuel['Total Fuel Used'] = pd.to_numeric(filtered_fuel['Total Fuel Used'], errors='coerce')
     filtered_fuel['Fuel Added (Total)'] = pd.to_numeric(filtered_fuel['Fuel Added (Total)'], errors='coerce')
-    filtered_fuel = filtered_fuel.dropna(subset=['Total Fuel Used', 'Fuel Added (Total)'])
+    filtered_fuel['Closing Fuel Level']= pd.to_numeric(filtered_fuel['Closing Fuel Level'], errors='coerce')
+    
+    filtered_fuel['Total'] = pd.to_numeric(filtered_fuel['Total Fuel Used'], errors='coerce')
+    filtered_fuel['Fuel Level']= pd.to_numeric(filtered_fuel['Closing Fuel Level'], errors='coerce')
+    filtered_fuel = filtered_fuel.dropna(subset=['Total Fuel Used', 'Fuel Added (Total)', 'Fuel Level'])
     
     if not filtered_fuel.empty:
         fig_fuel = px.bar(
             filtered_fuel,
             x='Month',
-            y=['Total Fuel Used', 'Fuel Added (Total)'],
+            y=['Total Fuel Used', 'Fuel Added (Total)', 'Fuel Level'],
             barmode='group',
             labels={'Month': 'Month', 'value': 'Fuel (Litres)'},
-            color_discrete_sequence=['#C7A64F', '#2C3E50']
+            color_discrete_sequence= brand_colors[:3]
         )
     else:
         fig_fuel = px.bar(title="No fuel data available")
@@ -670,26 +735,50 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     )
 
    
+
+
     # --- Stock Chart (Tab-2) with brand colors ---
+    filtered_stock = local_df_rc_melt.copy()
+
     if selected_months:
-        local_df_rc_melt = local_df_rc_melt[local_df_rc_melt['Month'].isin(selected_months)]
+        filtered_stock = filtered_stock[filtered_stock['Month'].isin(selected_months)]
 
     if selected_generators:
-        local_df_rc_melt = local_df_rc_melt[local_df_rc_melt['Generator_Size'].isin(selected_generators)]
-       
-    if not local_df_rc_melt.empty:
+        filtered_stock = filtered_stock[filtered_stock['Generator_Size'].isin(selected_generators)]
+
+    if selected_filter:
+        filtered_stock = filtered_stock[filtered_stock['Filter_Type'].isin(selected_filter)]
+
+    # Group by Month, Generator_Size, and Filter_Type to maintain detail
+    if not filtered_stock.empty:
+        # First grouping - maintain detail by Generator_Size and Filter_Type
+        stock_detailed = filtered_stock.groupby(['Month','Generator_Size', 'Filter_Type'])[['Consumed_Stock', 'Remaining_Stock']].sum().reset_index()
+        
+        # Convert Month to datetime if it's in date format, then extract month name
+        if stock_detailed['Month'].dtype == 'object' and '-' in str(stock_detailed['Month'].iloc[0]):
+            stock_detailed['Month'] = pd.to_datetime(stock_detailed['Month']).dt.strftime('%B')
+        
+        # Second grouping - aggregate by Month for the chart (sum across Generator_Size and Filter_Type)
+        stock_monthly = stock_detailed
+        # .groupby('Month', as_index=False)[['Consumed_Stock', 'Remaining_Stock']].sum()
+        
+        # Ensure months are in correct order
+        month_order = ["January","February","March","April","May","June","July","August","September","October","November","December"]
+        stock_monthly['Month'] = pd.Categorical(stock_monthly['Month'], categories=month_order, ordered=True)
+        stock_monthly = stock_monthly.sort_values('Month')
+        
+        # Create the bar chart with side-by-side bars (same format as fuel chart)
         fig_stock = px.bar(
-            local_df_rc_melt,
-            x='Filter_Type',
-            y='Units',
-            color='Stock_Status',
-            barmode='stack',
-            labels={'Units': 'Units', 'Filter_Type': 'Filter Type'},
-            color_discrete_sequence=['#C7A64F', '#34495E']
+            stock_monthly,
+            x='Month',
+            y=['Consumed_Stock', 'Remaining_Stock'],
+            barmode='group',
+            labels={'Month': 'Month', 'value': 'Units'},
+            color_discrete_sequence=['#C7A64F', '#2C3E50']
         )
     else:
         fig_stock = px.bar(title="No stock data available")
-    
+
     fig_stock.update_layout(
         title=dict(text='📦 Stock Inventory', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
         autosize=True,
@@ -707,6 +796,8 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
             borderwidth=0
         )
     )
+
+    fig_stock.update_xaxes(tickangle=-45)
 
 
     # --- Runtime Chart (Tab-2) ---
@@ -844,7 +935,7 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     operated_hours_display = f"{actual_operated_hours:,.0f}h"
     planned_outage_display = f"{planned_outage_hours:,.0f}h"
 
-    # Debug print (optional - detailed breakdown)
+    #Debug print (optional - detailed breakdown)
     # print(f"\n{'='*60}")
     # print(f"Period: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
     # print(f"{'='*60}")
@@ -867,10 +958,18 @@ def update_chart(selected_locations, selected_months, selected_generators, n_int
     # print(f"{'='*60}\n")
 
 
-    return (fig_bar, fig_line, table_data, table_columns, 
-        gravitas_revenue, gravitas_subs_revenue, 
-        operated_hours_display, planned_outage_display,
-        fig_pie, fig_fuel, fig_down, fig_stock, fig_runtime)
+    # return (fig_bar, fig_line, #table_data, table_columns, 
+    #     gravitas_revenue, gravitas_subs_revenue, 
+    #     operated_hours_display, planned_outage_display,
+    #     fig_pie, fig_fuel, fig_down, fig_stock, fig_runtime)
+
+
+    return (fig_bar, fig_line, fig_trans,
+    gravitas_revenue, gravitas_subs_revenue, 
+    operated_hours_display, planned_outage_display,
+    fig_pie, fig_fuel, fig_down, fig_stock, fig_runtime)
+
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8050))
