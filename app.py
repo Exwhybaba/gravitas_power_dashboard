@@ -145,12 +145,13 @@ all_locations = sorted(list(set(
      'HELIUM', 'DIC']
 )))
 
+
 #subsName = ['Rosewood', 'Cedar A', 'Cedar B']
 # Location filter (now includes both meter locations and transaction addresses)
 metr_loc = dcc.Dropdown(
         id='location_filter',
         options=[{"label": loc, "value": loc} for loc in all_locations],
-        #value=[{}]
+        value=[],
         placeholder="Select Location",
         multi=True,
         style={'width': '90%', 'marginTop': '30%', "marginLeft": "5%"}
@@ -160,6 +161,7 @@ metr_loc = dcc.Dropdown(
 mtr_month = dcc.Dropdown(
         id='month_filter',
         options=[{"label": m, "value": m} for m in run_time["Month"].unique()],
+        value=[],
         placeholder="Select Month",
         multi=True,
         style={'width': '90%', 'marginTop': '30%', "marginLeft": "5%"}
@@ -177,6 +179,7 @@ filter = df_rc_melt['Filter_Type'].unique().tolist()
 gen_dropdown = dcc.Dropdown(
     id='generator_type',
     options=[{"label": gen, "value": gen} for gen in gens],
+    value=[],
     placeholder="Select Generator Type",
     multi=True,
     style={'width': '90%', 'marginTop': '30%', "marginLeft": "5%"}
@@ -185,6 +188,7 @@ gen_dropdown = dcc.Dropdown(
 filter_dropdown = dcc.Dropdown(
     id='filter_type',
     options=[{"label": fil, "value": fil} for fil in filter],
+    value=[],
     placeholder="Filter Type",
     multi=True,
     style={'width': '90%', 'marginTop': '30%', "marginLeft": "5%"}
@@ -361,7 +365,7 @@ def switch_tabs(tab1_clicks, tab2_clicks):
         Input('generator_type', 'value'),
         Input('filter_type', 'value'),
         Input('data-refresh-interval', 'n_intervals'),
-    ],
+    ]
    
 )
 def update_chart(selected_locations, selected_months, selected_generators, selected_filter, n_intervals):
@@ -512,7 +516,7 @@ def update_chart(selected_locations, selected_months, selected_generators, selec
         fig_trans.update_traces(line=dict(width=2.5), marker=dict(size=8))
         
         fig_trans.update_layout(
-            title=dict(text='💰 Top 5 Locations - Revenue Trend', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
+            title=dict(text='💰 Top 4 Locations - Revenue Trend', font=dict(size=12, color='#111827'), x=0.5, xanchor='center'),
             autosize=True,
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
