@@ -241,7 +241,7 @@ app.layout = html.Div([
                    style={"marginLeft": "1.5rem", "marginTop": "4rem"}),
         html.Button("Operations", id="tab2-btn", className="tab-btn",
                    style={"marginLeft": "1.5rem", "marginTop": "4rem"})
-    ], className="sidebar"),
+    ], id="sidebar", className="sidebar"),
     
     html.Div([
         html.H2("Power Dashboard", className="title"),
@@ -275,7 +275,23 @@ app.layout = html.Div([
                 html.P("Planned Outage", className="kpi-label"),
                 html.H3(id="planned_outage", className="kpi-value")
             ], className="kpi-text")
-        ], className="kpi-card")
+        ], className="kpi-card"),
+
+        html.Div([
+            html.Div("⛽", className="kpi-icon"),
+            html.Div([
+                html.P("Fuel Efficiency", className="kpi-label"),
+                html.H3(id="fuel_efficiency_kpi", className="kpi-value")
+            ], className="kpi-text")
+        ], className="kpi-card"),
+
+        html.Div([
+            html.Div("📈", className="kpi-icon"),
+            html.Div([
+                html.P("% Change in Revenue", className="kpi-label"),
+                html.H3(id="revenue_change_kpi", className="kpi-value")
+            ], className="kpi-text")
+        ], className="kpi-card"),
     ], className="header"),
 
     html.Div([
@@ -298,6 +314,7 @@ app.layout = html.Div([
 
     html.Div([
         html.Div([
+            html.Div(id='fuel_change_kpi', style={'textAlign': 'center', 'paddingBottom': '10px', 'fontWeight': 'bold', 'fontSize': '1.1em'}),
             fuelChart
         ], className="card-1"),
 
@@ -311,11 +328,12 @@ app.layout = html.Div([
 
         html.Div([
             runtimeChart
-        ], className="card-4"),    
+        ], className="card-4"),
     ], id="tab-2", className="section", style={"display": "none"}),
-    
     dcc.Interval(id='data-refresh-interval', interval=300000, n_intervals=0),  # 5 minutes = 300000 ms
 ], className="app-grid")
+
+
 
 # Tab switching callback
 @app.callback(
@@ -353,8 +371,11 @@ def switch_tabs(tab1_clicks, tab2_clicks):
         Output('subs_revenue', 'children'),
         Output('operated_hours', 'children'),
         Output('planned_outage', 'children'),
+        Output('fuel_efficiency_kpi', 'children'),
+        Output('revenue_change_kpi', 'children'),
         Output('cost_pie', 'figure'),
         Output('fuel_chart', 'figure'),
+        Output('fuel_change_kpi', 'children'),
         Output('downtime_chart', 'figure'),
         Output('stock_chart', 'figure'),
         Output('runtime_chart', 'figure'),
@@ -381,7 +402,9 @@ def update_chart(selected_locations, selected_months, selected_generators, selec
         local_df_downTime = df_downTime.copy()
         local_df_rc_melt = df_rc_melt.copy()
         local_df_agg = df_agg.copy()
-
+        local_df_cost = df_cost.copy()
+        local_run_time = run_time.copy()
+        
     filtered_meter = local_df_meter.copy()
 
     if selected_locations:
@@ -455,7 +478,7 @@ def update_chart(selected_locations, selected_months, selected_generators, selec
     # Style the line traces with gold tones
     fig_line.update_traces(line=dict(width=2.5))
 
-    # --- Transactions Chart (replacing table) ---
+     # --- Transactions Chart (replacing table) ---
     chart_df = local_power_df.copy()
 
     # Filter by month
@@ -463,21 +486,27 @@ def update_chart(selected_locations, selected_months, selected_generators, selec
         months_selected = selected_months if isinstance(selected_months, list) else [selected_months]
         chart_df = chart_df[chart_df['Month'].isin(months_selected)]
 
-    # Fix addresses to match the corrected names
-    chart_df.loc[chart_df['Meter Number'] == 23220035788, "Resident Address"] = 'Rosewood'
-    chart_df.loc[chart_df['Meter Number'] == 4293682789, "Resident Address"] = 'NBIC 2' 
-
-    chart_df['Resident Address'] = chart_df['Resident Address'].replace(['C A','Bites To Eat [Tuck-shop]',
-                                                'Gravitas Head Office', 'Gravitas Engineering Yard', 'HELIUM '],
-                                                ['Cedar A', 'Tuck-shop', 'Head Office', 'Engineering Yard', 'HELIUM'])
-    
-
-    mask = (chart_df['Resident Address'] == 'Cedar A') & (chart_df['Meter Number'] == 4293684496)
-    if not chart_df.loc[mask].empty:
-        min_index = chart_df.loc[mask, 'Amount'].idxmin()
-        chart_df.loc[min_index, 'Resident Address'] = 'Cedar B'
+    # --- Data Cleaning for Trend Chart ---
+    # Unify address cleaning to be consistent with KPI calculations.
+    # This fixes bugs related to incorrect slicing and inconsistent naming.
+    meter_to_name = {
+        23220035721: "Rosewood A",
+        23220035788: "Rosewood B",
+        4293684496:  "Cedar A",
+        4293682284:  "Cedar B",
+        4293683936:  "NBIC 1",
+        4293682789:  "NBIC 2",
+        4293682193:  "Head Office",
+        4293683571:  "Engineering Yard",
+        4293683993:  "HELIUM",
+        4293682201:  "DIC",
+        120230672145: "Tuckshop Water",
+        4293684066: "Tuck-shop"
+    }
+    chart_df['Resident Address'] = chart_df['Meter Number'].map(meter_to_name).fillna(chart_df['Resident Address'])
 
     # EXCLUDE Engineering Yard, Head Office, and Tuck-shop
+    # The trend chart is for subscriber locations.
     chart_df = chart_df[~chart_df['Resident Address'].isin(['Engineering Yard', 'Head Office', 'Tuck-shop'])]
 
     # Filter by selected location/address
@@ -489,23 +518,20 @@ def update_chart(selected_locations, selected_months, selected_generators, selec
     # Group by Month and Resident Address to show trends over time
     if not chart_df.empty:
         # Group by both Month and Resident Address to get monthly trends
+        # Determine top 4 locations based on total revenue in the filtered chart_df
+        top_4_locations = chart_df.groupby('Resident Address')['Amount'].sum().nlargest(4).index
+
+        # Filter the dataframe to only include these top locations
+        top_locations_df = chart_df[chart_df['Resident Address'].isin(top_4_locations)]
+
+        # Now, group the filtered data by month and address for the trend chart
+        address_monthly = top_locations_df.groupby(['Month', 'Resident Address'], as_index=False)['Amount'].sum()
+        
+        # Ensure months are in correct order for plotting
         month_order = ["January","February","March","April","May","June","July","August","September","October","November","December"]
-        
-        address_monthly = chart_df.groupby(['Month', 'Resident Address'], as_index=False)['Amount'].sum()
-        
-        # Get top 5 locations by total revenue
-        top_5_locations = address_monthly.groupby('Resident Address')['Amount'].sum().nlargest(4).index
-       
-        
-        # Filter for only top 5 locations
-        address_monthly = address_monthly[address_monthly['Resident Address'].isin(top_5_locations)]
-        
-        # Ensure months are in correct order
         address_monthly['Month'] = pd.Categorical(address_monthly['Month'], categories=month_order, ordered=True)
         address_monthly = address_monthly.sort_values('Month')
-        
 
-        
         # Create line chart
         fig_trans = px.line(
             address_monthly,
@@ -583,26 +609,6 @@ def update_chart(selected_locations, selected_months, selected_generators, selec
     # Optional: Also create a clean "Meter Name" column (highly recommended)
     table_df['Meter Name'] = table_df['Meter Number'].map(meter_to_name)
 
-
-    # Now correctly map Meter Number → proper name and fix Resident Address
-    table_df['Paid By'] = table_df['Meter Number'].map(meter_to_name).fillna(table_df['Paid By'])
-
-    # Optional: Also create a clean "Meter Name" column (highly recommended)
-    table_df['Meter Name'] = table_df['Meter Number'].map(meter_to_name)
-
-    # # Fix addresses
-    # table_df.loc[table_df['Meter Number'] == 23220035788, "Resident Address"] = 'Rosewood'
-    # table_df.loc[table_df['Meter Number'] == 4293682789, "Resident Address"] = 'NBIC 2' 
-
-    # table_df['Resident Address'] = table_df['Resident Address'].replace(['C A','Bites To Eat [Tuck-shop]',
-    #                                             'Gravitas Head Office', 'Gravitas Engineering Yard', 'HELIUM '],
-    #                                             ['Cedar A', 'Tuck-shop', 'Head Office', 'Engineering Yard', 'HELIUM'])
-    
-    # mask = (table_df['Resident Address'] == 'Cedar A') & (table_df['Meter Number'] == 4293684496)
-    # if not table_df.loc[mask].empty:
-    #     min_index = table_df.loc[mask, 'Amount'].idxmin()
-    #     table_df.loc[min_index, 'Resident Address'] = 'Cedar B'
-
     # Filter by selected location/address
     if selected_locations:
         locations_selected = selected_locations if isinstance(selected_locations, list) else [selected_locations]
@@ -664,7 +670,7 @@ def update_chart(selected_locations, selected_months, selected_generators, selec
     )
 
     total_subs = subs_sum + gravitas_subscriber
-    gravitas_subs_revenue = f"₦{total_subs:,.0f}"   
+    gravitas_subs_revenue = f"₦{total_subs:,.0f}"    
 
     # --- Cost Pie Chart ---
     filtered_cost = local_df_cost_2025.copy() 
@@ -805,8 +811,7 @@ def update_chart(selected_locations, selected_months, selected_generators, selec
             stock_detailed['Month'] = pd.to_datetime(stock_detailed['Month']).dt.strftime('%B')
         
         # Second grouping - aggregate by Month for the chart (sum across Generator_Size and Filter_Type)
-        stock_monthly = stock_detailed
-        # .groupby('Month', as_index=False)[['Consumed_Stock', 'Remaining_Stock']].sum()
+        stock_monthly = stock_detailed.groupby('Month', as_index=False)[['Consumed_Stock', 'Remaining_Stock']].sum()
         
         # Ensure months are in correct order
         month_order = ["January","February","March","April","May","June","July","August","September","October","November","December"]
@@ -887,6 +892,65 @@ def update_chart(selected_locations, selected_months, selected_generators, selec
         plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=28, b=8, l=8, r=8)
     )
+
+    # --- Percent Change in Total Revenue KPI ---
+    revenue_change_display = "N/A"  # Default value
+
+    if selected_months:
+        # Current total revenue is the sum of the already calculated gravitas and subscriber revenues
+        current_total_revenue = total_gravitas + total_subs
+
+        # Determine the previous period
+        month_order = list(calendar.month_name)[1:]  # Full list of month names
+        selected_indices = sorted([month_order.index(m) for m in selected_months])
+        min_index = selected_indices[0]
+        num_months = len(selected_months)
+        
+        # Ensure the selected months are a continuous block (e.g., Feb-Mar, not Feb-Apr)
+        is_contiguous = all(selected_indices[i] == selected_indices[0] + i for i in range(num_months))
+        prev_start_index = min_index - num_months
+
+        if prev_start_index >= 0 and is_contiguous:
+            # Previous period exists and the selection is contiguous
+            prev_indices = range(prev_start_index, min_index)
+            previous_months = [month_order[i] for i in prev_indices]
+
+            # --- Calculate Previous Period's Total Revenue ---
+            
+            # 1. Filter meter data for the previous period
+            prev_meter_df = local_df_meter[local_df_meter["Month"].isin(previous_months)].copy()
+            prev_meter_df['Rate'] = prev_meter_df['Location'].apply(lambda x: 285 if x in ['9mobile', 'Providus'] else 100)
+            prev_meter_df['Amount'] = prev_meter_df['Rate'] * prev_meter_df['Monthly_Consumption']
+            
+            prev_gravitas_partner = round(prev_meter_df.loc[
+                prev_meter_df['Location'].isin(['9mobile', 'Providus', 'Western Lodge']), "Amount"
+            ].sum(), 2)
+            prev_gravitas_subscriber = round(prev_meter_df.loc[
+                prev_meter_df['Location'] == 'Canteen', "Amount"
+            ].sum(), 2)
+
+            # 2. Filter transaction data for the previous period
+            prev_power_df = local_power_df[local_power_df['Month'].isin(previous_months)].copy()
+            prev_power_df['Resident Address'] = prev_power_df['Meter Number'].map(meter_to_name).fillna(prev_power_df['Resident Address'])
+
+            # 3. Sum revenues directly from the filtered transaction data
+            prev_gho = prev_power_df[prev_power_df['Resident Address'] == 'Head Office']['Amount'].sum()
+            prev_gey = prev_power_df[prev_power_df['Resident Address'] == 'Engineering Yard']['Amount'].sum()
+            previous_total_gravitas = prev_gho + prev_gey + prev_gravitas_partner
+
+            subscriber_cols = ['Cedar A', 'DIC', 'NBIC 1', 'NBIC 2', 'HELIUM', 
+                               'Rosewood A', 'Rosewood B', 'Tuck-shop', 'Cedar B']
+            prev_subs_sum = prev_power_df[prev_power_df['Resident Address'].isin(subscriber_cols)]['Amount'].sum()
+            previous_total_subs = prev_subs_sum + prev_gravitas_subscriber
+            
+            previous_total_revenue = previous_total_gravitas + previous_total_subs
+
+            # 4. Calculate percentage change and format the display
+            if previous_total_revenue > 0:
+                percent_change = ((current_total_revenue - previous_total_revenue) / previous_total_revenue) * 100
+                arrow, color = ("▲", "green") if percent_change > 0 else (("▼", "red") if percent_change < 0 else ("", "grey"))
+                revenue_change_display = html.Span([f"{percent_change:,.2f}% ", html.Span(arrow, style={'color': color, 'fontSize': '1.2em'})])
+
 
     # === Operated Hours + Planned Outage Calculation ===
     filtered_runtime = local_df_agg.copy()
@@ -984,41 +1048,39 @@ def update_chart(selected_locations, selected_months, selected_generators, selec
     operated_hours_display = f"{actual_operated_hours:,.1f}h"
     planned_outage_display = f"{planned_outage_hours:,.1f}h"
 
-    #Debug print (optional - detailed breakdown)
-    # print(f"\n{'='*60}")
-    # print(f"Period: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
-    # print(f"{'='*60}")
-    # print(f"Weekday Distribution:")
-    # for weekday in range(7):
-    #     day_name = calendar.day_name[weekday]
-    #     count = weekday_counts.get(weekday, 0)
-    #     print(f"  {day_name:10s}: {count} days")
+    # --- Fuel Efficiency KPI ---
+    # Fuel Efficiency = Total Fuel Used (Litres) / Total Hours Operated (Hours)
+    
+    # Fuel consumed is from the fuel supplied data (filtered by month)
+    filtered_fuel_kpi = local_df_supplied.copy()
+    if selected_months:
+        filtered_fuel_kpi = filtered_fuel_kpi[filtered_fuel_kpi['Month'].isin(selected_months)]
+    total_fuel_used = pd.to_numeric(filtered_fuel_kpi['Total Fuel Used'], errors='coerce').sum()
 
-    # print(f"\nScheduled Hours Breakdown:")
-    # for key, hours in sorted(scheduled_breakdown.items()):
-    #     print(f"  {key:20s}: {hours:6.1f}h")
+    # Calculate Fuel Efficiency using actual_operated_hours calculated above
+    if actual_operated_hours > 0:
+        fuel_efficiency = total_fuel_used / actual_operated_hours
+        fuel_efficiency_display = f"{fuel_efficiency:.2f} L/hr"
+    else:
+        fuel_efficiency_display = ""
 
-    # print(f"\n{'='*60}")
-    # print(f"Total Days in Period    : {total_days}")
-    # print(f"Total Hours Available   : {total_hours_in_period:,}h")
-    # print(f"Total Scheduled Hours   : {total_scheduled_hours:,.1f}h")
-    # print(f"Actual Operated Hours   : {actual_operated_hours:,.0f}h")
-    # print(f"Planned Outage Hours    : {planned_outage_hours:,.0f}h")
-    # print(f"{'='*60}\n")
+    # --- Percent Change in Fuel Used KPI ---
+    fuel_change_display = ""
+    if selected_months and 'prev_start_index' in locals() and prev_start_index >= 0 and is_contiguous:
+        # `total_fuel_used` is the current value, calculated above for the efficiency KPI
+        prev_fuel_df = local_df_supplied[local_df_supplied['Month'].isin(previous_months)]
+        previous_total_fuel_used = pd.to_numeric(prev_fuel_df['Total Fuel Used'], errors='coerce').sum()
 
-
-    # return (fig_bar, fig_line, #table_data, table_columns, 
-    #     gravitas_revenue, gravitas_subs_revenue, 
-    #     operated_hours_display, planned_outage_display,
-    #     fig_pie, fig_fuel, fig_down, fig_stock, fig_runtime)
-
+        if previous_total_fuel_used > 0:
+            percent_change = ((total_fuel_used - previous_total_fuel_used) / previous_total_fuel_used) * 100
+            # For fuel, an increase is bad (red), a decrease is good (green)
+            arrow, color = ("▲", "red") if percent_change > 0 else ("▼", "green")
+            fuel_change_display = html.Span([f"💧 {percent_change:,.2f}% ", html.Span(arrow, style={'color': color, 'fontSize': '1.2em'})])
 
     return (fig_bar, fig_line, fig_trans,
     gravitas_revenue, gravitas_subs_revenue, 
-    operated_hours_display, planned_outage_display,
-    fig_pie, fig_fuel, fig_down, fig_stock, fig_runtime)
-
-
+    operated_hours_display, planned_outage_display, fuel_efficiency_display, revenue_change_display,
+    fig_pie, fig_fuel, fuel_change_display, fig_down, fig_stock, fig_runtime)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8050))

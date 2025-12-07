@@ -357,7 +357,6 @@ section h1, section h2, section h3 {
 
 /* Add these to your existing CSS file */
 
-/* Sidebar Toggle Button */
 .sidebar-toggle-js {
   display: none !important;
   font-size: 20px !important;
